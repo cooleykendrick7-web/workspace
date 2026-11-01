@@ -20,7 +20,7 @@ from pydantic import BaseModel
 BASE = Path(__file__).parent
 DB_PATH = os.environ.get("WORKSPACE_DB", str(BASE / "workspace.db"))
 
-app = FastAPI(title="Workspace", version="1.2.0")
+app = FastAPI(title="Workspace", version="1.3.0")
 SIGNUP_STATES = ("not_started", "queued", "started", "done", "needs_ken")
 BATCH1 = ("billo", "collabstr", "mycastingfile", "usertesting", "respondent")  # easiest free signups, first auto-signup run
 
@@ -85,6 +85,10 @@ def init_db():
     cols = {r[1] for r in c.execute("PRAGMA table_info(opportunities)")}
     if "signup_state" not in cols:
         c.execute("ALTER TABLE opportunities ADD COLUMN signup_state TEXT DEFAULT 'not_started'")
+    if "apply_approved" not in cols:
+        c.execute("ALTER TABLE opportunities ADD COLUMN apply_approved INTEGER DEFAULT 0")
+    if "apply_note" not in cols:
+        c.execute("ALTER TABLE opportunities ADD COLUMN apply_note TEXT DEFAULT ''")
     for row in SEED:
         c.execute("INSERT OR IGNORE INTO opportunities(slug,title,category,platform,pay_label,pay_low,pay_high,url,location,requirements,note,status,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'found',?)",
                   (*row, datetime.datetime.utcnow().isoformat()))
@@ -102,7 +106,7 @@ async def headers(request: Request, call_next):
 
 @app.get("/healthz")
 async def healthz():
-    return {"ok": True, "service": "workspace", "version": "1.2.0"}
+    return {"ok": True, "service": "workspace", "version": "1.3.0"}
 
 @app.get("/api/opportunities")
 async def api_list(category: str | None = None):
@@ -236,8 +240,9 @@ async def api_operator_summary():
     needs_ken = [dict(r) for r in rows if (r["signup_state"] or "") == "needs_ken"]
     queued = [dict(r) for r in rows if (r["signup_state"] or "") == "queued"]
     signed_up = [dict(r) for r in rows if (r["signup_state"] or "") == "done"]
+    approved = [dict(r) for r in rows if (r["apply_approved"] or 0) == 1]
     return {
-        "service": "workspace", "version": "1.2.0",
+        "service": "workspace", "version": "1.3.0",
         "total": len(rows),
         "by_category": {cat: cnt("category", cat) for cat in CATEGORIES},
         "by_status": {s: cnt("status", s) for s in STATUSES},
@@ -246,10 +251,14 @@ async def api_operator_summary():
         "signed_up": [{"slug": r["slug"], "platform": r["platform"]} for r in signed_up],
         "queued_for_signup": [{"slug": r["slug"], "platform": r["platform"], "category": r["category"]} for r in queued],
         "needs_ken": [{"slug": r["slug"], "platform": r["platform"], "note": r["note"]} for r in needs_ken],
+        "approved_to_apply": [{"slug": r["slug"], "platform": r["platform"], "category": r["category"],
+                               "status": r["status"], "signup_state": r["signup_state"] or "not_started",
+                               "apply_note": r["apply_note"] or ""} for r in approved],
+        "approved_count": len(approved),
         "next_actions": [
-            "Batch 1 auto-signup run: Billo, Collabstr, MyCastingFile, UserTesting, Respondent (free, no card).",
-            "Ken-only steps that stop the run cold: creating a password (Secure Vault card), email verification codes, PayPal linking, any ID/tax/address-for-payment form.",
-            "After signup: complete each profile with the Signup Kit so gigs can actually land.",
+            "APPLY QUEUE: when Ken taps Approve on a gig, Milli does the applying herself — pitches, submissions, screeners she can answer from his confirmed profile facts. Unknown screener answers and anything needing a signature, contract, payment, or Ken's voice/recording stop and get noted on the item.",
+            "Batch 1 accounts: Collabstr / MyCastingFile / Respondent / UserTesting created; Billo is iPhone-app-only (Ken). Finishing steps still Ken's: UserTesting income + work status, MyCastingFile emergency contact, email verification taps, Collabstr Go Live identity check.",
+            "Ken-only steps that stop any run cold: email verification codes, PayPal linking, any ID/tax/address-for-payment form.",
         ],
         "updated": datetime.datetime.utcnow().isoformat(),
     }
@@ -268,6 +277,33 @@ async def api_set_signup(slug: str, body: SignupIn):
     c.commit(); n = cur.rowcount; c.close()
     if not n: raise HTTPException(404, "Not found.")
     return {"ok": True, "slug": slug, "signup_state": body.signup_state}
+
+class ApproveIn(BaseModel):
+    approved: bool
+
+@app.patch("/api/opportunities/{slug}/approve")
+async def api_set_approve(slug: str, body: ApproveIn):
+    # Ken taps Approve on the board -> Milli does the actual applying (Ken's order 2026-11-01).
+    # No password by Ken's order — the board is open.
+    c = db()
+    cur = c.execute("UPDATE opportunities SET apply_approved=?, updated_at=? WHERE slug=?",
+                    (1 if body.approved else 0, datetime.datetime.utcnow().isoformat(), slug))
+    c.commit(); n = cur.rowcount; c.close()
+    if not n: raise HTTPException(404, "Not found.")
+    return {"ok": True, "slug": slug, "apply_approved": body.approved}
+
+class ApplyNoteIn(BaseModel):
+    note: str
+
+@app.patch("/api/opportunities/{slug}/apply-note")
+async def api_set_apply_note(slug: str, body: ApplyNoteIn):
+    # Milli records what happened when she applied (or what's blocking it).
+    c = db()
+    cur = c.execute("UPDATE opportunities SET apply_note=?, updated_at=? WHERE slug=?",
+                    (body.note[:500], datetime.datetime.utcnow().isoformat(), slug))
+    c.commit(); n = cur.rowcount; c.close()
+    if not n: raise HTTPException(404, "Not found.")
+    return {"ok": True, "slug": slug}
 
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 

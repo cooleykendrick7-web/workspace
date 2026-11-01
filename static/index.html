@@ -21,6 +21,8 @@ button.apply{background:#166534;color:#fff;padding:8px 12px;font-size:13px}
 button.book{background:#7c3aed;color:#fff;padding:8px 12px;font-size:13px}
 button.paidb{background:#16a34a;color:#fff;padding:8px 12px;font-size:13px}
 button.pass{background:#7f1d1d;color:#fff;padding:8px 12px;font-size:13px}
+button.approve{background:#b45309;color:#fff;padding:9px 13px;font-size:13px;border:1px solid #f59e0b}
+button.undo{background:#334155;color:#fff;padding:8px 12px;font-size:13px}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
 .tab{padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:700;cursor:pointer}
 .tab.on{background:var(--acc);color:#04121f;border-color:var(--acc)}
@@ -52,7 +54,8 @@ select,input{background:#0a1424;color:var(--txt);border:1px solid var(--line);bo
 <span class="mut">🧪 <b style="color:var(--txt)">Test</b> = sites pay you cash (or free products) to try products/apps and say what you think.<br>
 🤝 <b style="color:var(--txt)">Sponsor</b> = brands pay you to post about / film their product. “UGC” means you film it, they run the ad — no followers needed on the beginner ones.<br>
 🎬 <b style="color:var(--txt)">Casting (side job)</b> = paid acting / extra roles. Legit casting NEVER charges you to audition — anyone asking for an upfront fee is a scam.<br>
-Tap <b style="color:var(--txt)">Save</b> on anything you like, <b style="color:var(--txt)">Applied</b> after you sign up / apply, <b style="color:var(--txt)">Booked</b> when you land one, and put the real dollars in Admin when you get <b style="color:var(--txt)">Paid</b>.</span></div>
+Tap <b style="color:var(--txt)">Save</b> on anything you like, <b style="color:var(--txt)">Applied</b> after you sign up / apply, <b style="color:var(--txt)">Booked</b> when you land one, and put the real dollars in Admin when you get <b style="color:var(--txt)">Paid</b>.<br>
+👆 <b style="color:#fbbf24">NEW — the easy way:</b> tap <b style="color:var(--txt)">APPROVE — MILLI APPLIES FOR ME</b> on any gig and Milli does the actual applying for you: the pitch, the submission, the screener questions she can answer from your profile. She reports back right on that gig what happened. You just approve and collect.</span></div>
 
 <div class="tabs">
   <button class="tab on" data-f="all">All</button>
@@ -74,7 +77,7 @@ Tap <b style="color:var(--txt)">Save</b> on anything you like, <b style="color:v
 <div id="wrap"></div>
 
 <div class="notebox"><b>📱 Put Workspace on your home screen:</b><div class="mut" style="margin-top:6px"><b>iPhone:</b> Share → <b>Add to Home Screen</b>. <b>Android:</b> ⋮ menu → <b>Install app</b>.</div></div>
-<p class="mut" style="text-align:center;margin-top:16px">Workspace v1.0 · Pay ranges are what platforms publish / widely report — never a guarantee · “Paid” counts only money actually received · Researched & verified Nov 1, 2026.</p>
+<p class="mut" style="text-align:center;margin-top:16px">Workspace v1.3 · Pay ranges are what platforms publish / widely report — never a guarantee · “Paid” counts only money actually received · Researched & verified Nov 1, 2026.</p>
 </main>
 <div id="flashWrap"></div>
 <script>
@@ -106,6 +109,11 @@ function render(){
     else if(r.status==='booked')acts=`<span class="mut">Booked — mark Paid in Admin when the money lands 💵</span>`;
     else if(r.status==='paid')acts=`<span class="mut">💵 Paid ${r.paid_amount?money(r.paid_amount):''}</span>`;
     else acts=`<div class="row"><button class="save" onclick="setStatus('${r.slug}','found')">↩️ Reopen</button></div>`;
+    let appr='';
+    if(r.apply_approved){ appr=`<div class="row" style="margin-top:6px"><span class="badge" style="background:#14532d;color:#bbf7d0">✅ APPROVED — MILLI APPLIES</span><button class="undo" onclick="setApprove('${r.slug}',false)">↩️ Undo</button></div>`; }
+    else if(['found','saved'].includes(r.status)){ appr=`<div class="row" style="margin-top:6px"><button class="approve" onclick="setApprove('${r.slug}',true)">👆 APPROVE — MILLI APPLIES FOR ME</button></div>`; }
+    if(r.apply_note) appr+=`<div class="mut" style="margin-top:4px">📝 Milli: ${esc(r.apply_note)}</div>`;
+    acts+=appr;
     return `<tr><td><b>${name}</b> — ${esc(r.title)}<div class="mut">${esc(r.note||'')}</div></td><td><span class="badge cat-${r.category}">${catLabel[r.category]}</span></td><td><span class="pay">${esc(r.pay_label||'')}</span></td><td>${esc(r.location||'')}<div class="mut">${esc(r.requirements||'')}</div></td><td>${badge(r.status)}</td><td>${acts}</td></tr>`;
   }).join('')+'</table>';
 }
@@ -125,6 +133,7 @@ async function load(){
   }catch(e){}
 }
 window.setStatus=async(slug,status)=>{const r=await fetch('/api/opportunities/'+slug,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});if(r.ok){flash('✓ Updated — '+status);load();}else alert('Could not update.');};
+window.setApprove=async(slug,approved)=>{const r=await fetch('/api/opportunities/'+slug+'/approve',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved})});if(r.ok){flash(approved?'✅ Approved — Milli will apply for you':'↩️ Approval removed');load();}else alert('Could not update.');};
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');filter=t.dataset.f;render();});
 $('#sortSel').onchange=render; $('#q').oninput=render;
 load(); setInterval(load,20000);

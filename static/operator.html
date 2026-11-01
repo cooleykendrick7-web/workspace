@@ -89,17 +89,21 @@ select{background:#0a1424;color:var(--txt);border:1px solid var(--line);border-r
   <div class="card"><span>🙋 Needs Ken (his hands only)</span><b style="color:var(--red)" id="cKen">–</b><span>password / code / PayPal / ID steps</span></div>
   <div class="card"><span>💵 Paid to Ken so far</span><b style="color:var(--green)" id="cPaid">–</b><span>real money only</span></div>
   <div class="card"><span>🎯 Active gigs</span><b style="color:var(--acc)" id="cActive">–</b><span>saved + applied + booked</span></div>
+  <div class="card"><span>👆 Approved — Milli applies</span><b style="color:var(--gold)" id="cApproved">–</b><span>Ken approved · Milli does the applying</span></div>
 </div>
 
 <div class="notebox"><b>📋 Milli's next actions</b><div id="next" class="mut" style="margin-top:6px">Loading…</div></div>
 <div class="notebox" style="border-color:var(--gold)"><b>🛑 The hard-stop rule (always):</b> <span class="mut">auto-signup runs until a site asks for something only Ken can do — create a password (Secure Vault card pops for him), an email/text verification code, PayPal/bank linking, or ID/tax info. The run stops there, marks it <b style="color:#fecaca">NEEDS KEN</b> below, and moves to the next site. Nothing is ever faked past those steps.</span></div>
+
+<h2>👆 Approved by Ken — Milli applies</h2>
+<div id="approvedWrap">Loading…</div>
 
 <h2>📝 Signup queue — every platform</h2>
 <div id="queueWrap">Loading…</div>
 
 <h2>📌 Gig status — approve &amp; update everything</h2>
 <div id="statusWrap">Loading…</div>
-<p class="mut" style="text-align:center;margin-top:16px">Workspace Operator v1.2 · If it's not in this panel, it hasn't happened — no fake “signed up” claims, ever.</p>
+<p class="mut" style="text-align:center;margin-top:16px">Workspace Operator v1.3 · If it's not in this panel, it hasn't happened — no fake “signed up” claims, ever.</p>
 </main>
 <div id="flashWrap"></div>
 <script>
@@ -155,6 +159,9 @@ async function load(){
     $('#cKen').textContent=sum.by_signup.needs_ken;
     $('#cPaid').textContent=money(sum.paid_total);
     $('#cActive').textContent=sum.by_status.saved+sum.by_status.applied+sum.by_status.booked;
+    $('#cApproved').textContent=sum.approved_count||0;
+    const appr=sum.approved_to_apply||[];
+    $('#approvedWrap').innerHTML=appr.length?('<table><tr><th>Gig</th><th>Type</th><th>Account</th><th>Milli\u2019s apply note</th><th>Controls</th></tr>'+appr.map(r=>`<tr><td><b>${esc(r.platform)}</b></td><td>${esc(r.category)}</td><td><span class="badge ${esc(r.signup_state)}">${esc(r.signup_state.replace('_',' '))}</span></td><td class="mut">${esc(r.apply_note||'— not applied yet —')}</td><td><div class="row"><button class="green" onclick="markApplied('${r.slug}')">✅ Applied it</button><button onclick="applyNote('${r.slug}')">📝 Note</button><button class="gold" onclick="setApprove('${r.slug}',false)">↩️ Unapprove</button></div></td></tr>`).join('')+'</table>'):'<div class="notebox">Nothing approved right now. When Ken taps <b>👆 APPROVE — MILLI APPLIES FOR ME</b> on the board, the gig lands here and Milli does the applying.</div>';
     $('#next').innerHTML=sum.next_actions.map(a=>'• '+esc(a)).join('<br>');
     const order={queued:0,started:1,needs_ken:2,not_started:3,done:4};
     const rows=[...opps].sort((a,b)=>(order[a.signup_state||'not_started']-order[b.signup_state||'not_started'])||a.platform.localeCompare(b.platform));
@@ -170,5 +177,8 @@ async function load(){
 }
 window.setSignup=async(slug,state)=>{const r=await fetch('/api/opportunities/'+slug+'/signup',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({signup_state:state})});if(r.ok){flash('✓ '+slug+' → '+state);load();}else alert('Could not update.');};
 window.setGig=async(slug)=>{const st=document.querySelector('#gs_'+CSS.escape(slug)).value;const r=await fetch('/api/opportunities/'+slug,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:st})});if(r.ok){flash('✓ '+slug+' → '+st);load();}else alert('Could not update.');};
+window.setApprove=async(slug,approved)=>{const r=await fetch('/api/opportunities/'+slug+'/approve',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved})});if(r.ok){flash(approved?'✅ Approved':'↩️ Unapproved');load();}else alert('Could not update.');};
+window.markApplied=async(slug)=>{const a=await fetch('/api/opportunities/'+slug,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'applied'})});const b=await fetch('/api/opportunities/'+slug+'/approve',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved:false})});if(a.ok&&b.ok){flash('✅ '+slug+' marked APPLIED');load();}else alert('Could not update.');};
+window.applyNote=async(slug)=>{const n=prompt('Milli\u2019s apply note for this gig (what happened / what is blocking):','');if(n===null)return;const r=await fetch('/api/opportunities/'+slug+'/apply-note',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:n})});if(r.ok){flash('📝 Note saved');load();}else alert('Could not save note.');};
 load(); loadClock(); setInterval(()=>{load(); loadClock();},20000);
 </script></body></html>
