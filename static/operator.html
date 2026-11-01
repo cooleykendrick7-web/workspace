@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workspace — Operator Panel</title>
+<meta name="theme-color" content="#0b1020">
+<style>
+:root{--bg:#070b16;--panel:#0e1628;--panel2:#121f3a;--line:#21335c;--txt:#e8eefc;--mut:#93a7cf;--gold:#fbbf24;--green:#4ade80;--acc:#38bdf8;--red:#f87171}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+header{padding:16px 18px;background:linear-gradient(90deg,#052e16,#14532d);border-bottom:1px solid var(--line)}
+main{max-width:1020px;margin:0 auto;padding:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}.card b{font-size:25px;display:block}.card span{color:var(--mut);font-size:13px}
+button{background:var(--acc);color:#04121f;border:0;padding:8px 12px;border-radius:9px;font-weight:700;cursor:pointer;font-size:13px}
+button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}button.gold{background:var(--gold);color:#231a02}button.green{background:#16a34a;color:#fff}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+td,th{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;vertical-align:top}
+.mut{color:var(--mut);font-size:13px}a{color:var(--acc)}h2{margin:20px 0 8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase}
+.queued{background:#713f12;color:#fde68a}.done{background:#4ade80;color:#052e16}.needs_ken{background:#7f1d1d;color:#fecaca}.started{background:#155e75;color:#cffafe}.not_started{background:#475569;color:#e2e8f0}
+.notebox{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0;font-size:14px}
+.flash{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:#14532d;color:#bbf7d0;border:1px solid #16a34a;padding:12px 18px;border-radius:12px;font-weight:700;z-index:50}
+#liveDot{display:inline-block;width:9px;height:9px;border-radius:99px;background:#4ade80;margin-right:6px}
+</style></head>
+<body>
+<header><div class="row" style="justify-content:space-between"><div><h1 style="margin:0">🛰️ Workspace — Operator Panel</h1><div class="mut" style="color:#a7c4ae"><span id="liveDot"></span>Run by Milli for Ken. Status of EVERYTHING, live from the database. No password — tap and you're in. Auto-refreshes every 20 seconds. <span id="upd"></span></div></div>
+<div class="row"><a href="/"><button class="ghost">Board</button></a><a href="/admin"><button class="gold">⚙️ Admin</button></a></div></div></header>
+<main>
+<div class="cards">
+  <div class="card"><span>🔎 Total opportunities</span><b id="cTotal">–</b><span id="cCats"></span></div>
+  <div class="card"><span>✅ Signed up (accounts live)</span><b style="color:var(--green)" id="cSigned">–</b><span id="cSignedN"></span></div>
+  <div class="card"><span>⏳ In the signup queue</span><b style="color:var(--gold)" id="cQueued">–</b><span>Batch 1 goes first</span></div>
+  <div class="card"><span>🙋 Needs Ken (his hands only)</span><b style="color:var(--red)" id="cKen">–</b><span>password / code / PayPal / ID steps</span></div>
+  <div class="card"><span>💵 Paid to Ken so far</span><b style="color:var(--green)" id="cPaid">–</b><span>real money only</span></div>
+  <div class="card"><span>🎯 Active gigs</span><b style="color:var(--acc)" id="cActive">–</b><span>saved + applied + booked</span></div>
+</div>
+
+<div class="notebox"><b>📋 Milli's next actions</b><div id="next" class="mut" style="margin-top:6px">Loading…</div></div>
+<div class="notebox" style="border-color:var(--gold)"><b>🛑 The hard-stop rule (always):</b> <span class="mut">auto-signup runs until a site asks for something only Ken can do — create a password (Secure Vault card pops for him), an email/text verification code, PayPal/bank linking, or ID/tax info. The run stops there, marks it <b style="color:#fecaca">NEEDS KEN</b> below, and moves to the next site. Nothing is ever faked past those steps.</span></div>
+
+<h2>📝 Signup queue — every platform</h2>
+<div id="queueWrap">Loading…</div>
+
+<h2>📌 Gig status — every opportunity</h2>
+<div id="statusWrap">Loading…</div>
+<p class="mut" style="text-align:center;margin-top:16px">Workspace Operator v1.1 · If it's not in this panel, it hasn't happened — no fake “signed up” claims, ever.</p>
+</main>
+<div id="flashWrap"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function flash(m){$('#flashWrap').innerHTML=`<div class="flash">${esc(m)}</div>`;setTimeout(()=>$('#flashWrap').innerHTML='',3200);}
+async function load(){
+  try{
+    const [sum,opps]=await Promise.all([fetch('/api/operator/summary').then(r=>r.json()),fetch('/api/opportunities').then(r=>r.json())]);
+    $('#cTotal').textContent=sum.total;
+    $('#cCats').textContent=`${sum.by_category.test} testing · ${sum.by_category.sponsor} sponsor · ${sum.by_category.casting} casting`;
+    $('#cSigned').textContent=sum.by_signup.done;
+    $('#cSignedN').textContent=sum.signed_up.length?sum.signed_up.map(x=>x.platform).join(', '):'none yet — Batch 1 is the first run';
+    $('#cQueued').textContent=sum.by_signup.queued+sum.by_signup.started;
+    $('#cKen').textContent=sum.by_signup.needs_ken;
+    $('#cPaid').textContent=money(sum.paid_total);
+    $('#cActive').textContent=sum.by_status.saved+sum.by_status.applied+sum.by_status.booked;
+    $('#next').innerHTML=sum.next_actions.map(a=>'• '+esc(a)).join('<br>');
+    const order={queued:0,started:1,needs_ken:2,not_started:3,done:4};
+    const rows=[...opps].sort((a,b)=>(order[a.signup_state||'not_started']-order[b.signup_state||'not_started'])||a.platform.localeCompare(b.platform));
+    $('#queueWrap').innerHTML='<table><tr><th>Platform</th><th>Type</th><th>Signup state</th><th>Operator controls</th></tr>'+rows.map(r=>`<tr><td><b><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.platform)}</a></b><div class="mut">${esc(r.pay_label||'')}</div></td><td>${esc(r.category)}</td><td><span class="badge ${esc(r.signup_state||'not_started')}">${esc((r.signup_state||'not_started').replace('_',' '))}</span></td><td><div class="row">
+      <button onclick="setSignup('${r.slug}','queued')">⏳ Queue</button>
+      <button onclick="setSignup('${r.slug}','started')">▶️ Started</button>
+      <button class="green" onclick="setSignup('${r.slug}','done')">✅ Signed up</button>
+      <button class="gold" onclick="setSignup('${r.slug}','needs_ken')">🙋 Needs Ken</button>
+    </div></td></tr>`).join('')+'</table>';
+    $('#statusWrap').innerHTML='<table><tr><th>Opportunity</th><th>Status</th><th>Paid</th></tr>'+opps.map(r=>`<tr><td><b>${esc(r.platform)}</b> — ${esc(r.title)}</td><td>${esc(r.status)}</td><td>${r.status==='paid'?money(r.paid_amount):'—'}</td></tr>`).join('')+'</table>';
+    $('#upd').textContent='Updated '+new Date().toLocaleTimeString();
+  }catch(e){}
+}
+window.setSignup=async(slug,state)=>{const r=await fetch('/api/opportunities/'+slug+'/signup',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({signup_state:state})});if(r.ok){flash('✓ '+slug+' → '+state);load();}else alert('Could not update.');};
+load(); setInterval(load,20000);
+</script></body></html>

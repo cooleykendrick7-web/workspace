@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workspace — Admin Board</title>
+<meta name="theme-color" content="#0b1020">
+<style>
+:root{--bg:#070b16;--panel:#0e1628;--panel2:#121f3a;--line:#21335c;--txt:#e8eefc;--mut:#93a7cf;--gold:#fbbf24;--green:#4ade80;--acc:#38bdf8}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+header{padding:16px 18px;background:linear-gradient(90deg,#231a02,#29200a);border-bottom:1px solid var(--line)}
+main{max-width:1020px;margin:0 auto;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+input,select,textarea{background:#0a1424;color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:9px;font-size:14px;width:100%}
+label{font-size:13px;color:var(--mut);display:block;margin:10px 0 4px}
+button{background:var(--acc);color:#04121f;border:0;padding:10px 16px;border-radius:9px;font-weight:700;cursor:pointer}
+button.gold{background:var(--gold);color:#231a02}button.red{background:#7f1d1d;color:#fff}button.green{background:#16a34a;color:#fff}button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;vertical-align:top}
+.mut{color:var(--mut);font-size:13px}a{color:var(--acc)}
+.flash{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:#14532d;color:#bbf7d0;border:1px solid #16a34a;padding:12px 18px;border-radius:12px;font-weight:700;z-index:50}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+</style></head>
+<body>
+<header><div class="row" style="justify-content:space-between"><div><h1 style="margin:0">⚙️ Workspace — Admin Board</h1><div class="mut" style="color:#d8b84a">No password — you clicked, you're in. This is YOUR board only: add finds, fix pay, mark paid, delete duds.</div></div><a href="/"><button class="ghost">← Back to board</button></a></div></header>
+<main>
+<div class="card"><h2 style="margin-top:0">📊 Right now</h2><div id="sum" class="mut">Loading…</div></div>
+
+<div class="card"><h2 style="margin-top:0">➕ Add a new opportunity</h2>
+<div class="grid">
+<div><label>Slug (short id, no spaces — e.g. new-brand-deal)</label><input id="f_slug" placeholder="my-new-find"></div>
+<div><label>Platform / Company</label><input id="f_platform" placeholder="Brand or site name"></div>
+<div><label>Category</label><select id="f_category"><option value="test">🧪 Product Testing</option><option value="sponsor">🤝 Sponsorship</option><option value="casting">🎬 Casting</option></select></div>
+<div><label>Status</label><select id="f_status"><option value="found">found</option><option value="saved">saved</option><option value="applied">applied</option><option value="booked">booked</option><option value="paid">paid</option><option value="passed">passed</option></select></div>
+</div>
+<label>Title — what it is in plain words</label><input id="f_title" placeholder="e.g. Paid UGC video for a skincare brand">
+<div class="grid">
+<div><label>Pay label (exactly how it shows)</label><input id="f_paylabel" placeholder="$50–$200 per video"></div>
+<div><label>Pay low ($)</label><input id="f_paylow" type="number" step="0.01" placeholder="50"></div>
+<div><label>Pay high ($)</label><input id="f_payhigh" type="number" step="0.01" placeholder="200"></div>
+<div><label>Link (real site)</label><input id="f_url" placeholder="https://…"></div>
+</div>
+<div class="grid">
+<div><label>Location</label><input id="f_location" placeholder="Remote / Mississippi / Nationwide"></div>
+<div><label>Requirements</label><input id="f_requirements" placeholder="18+, no followers needed…"></div>
+</div>
+<label>Note</label><textarea id="f_note" rows="2" placeholder="Anything Ken needs to know — how it pays, how fast, catches"></textarea>
+<div style="margin-top:12px"><button class="gold" onclick="addOpp()">Add / Update opportunity</button> <span class="mut">Same slug = updates the existing one.</span></div>
+</div>
+
+<div class="card"><h2 style="margin-top:0">🗂️ All opportunities — manage</h2><div id="list">Loading…</div></div>
+<p class="mut" style="text-align:center">Workspace Admin v1.0 · Open by Ken's design (no password) · Money marked “paid” here is what counts as real.</p>
+</main>
+<div id="flashWrap"></div>
+<script>
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'$'+Number(n||0).toLocaleString('en-US',{maximumFractionDigits:0});
+function flash(m){document.querySelector('#flashWrap').innerHTML=`<div class="flash">${esc(m)}</div>`;setTimeout(()=>document.querySelector('#flashWrap').innerHTML='',3200);}
+async function load(){
+  const [opps,sum]=await Promise.all([fetch('/api/opportunities').then(r=>r.json()),fetch('/api/summary').then(r=>r.json())]);
+  document.querySelector('#sum').innerHTML=`<b style="color:var(--txt)">${sum.total}</b> total · 🧪 ${sum.by_category.test} testing · 🤝 ${sum.by_category.sponsor} sponsor · 🎬 ${sum.by_category.casting} casting<br>💵 Paid so far: <b style="color:var(--green)">$${Number(sum.paid_total).toFixed(2)}</b> · 🎯 Active (saved/applied/booked): <b style="color:var(--txt)">${sum.active_count}</b> worth ${money(sum.active_potential_low)}–${money(sum.active_potential_high)} at listed ranges<br>Statuses: ${Object.entries(sum.counts).map(([k,v])=>k+': '+v).join(' · ')}`;
+  document.querySelector('#list').innerHTML='<table><tr><th>Opportunity</th><th>Pay</th><th>Status</th><th>Actions</th></tr>'+opps.map(r=>`<tr><td><b>${esc(r.platform)}</b> — ${esc(r.title)}<div class="mut">${esc(r.category)} · ${esc(r.location||'')}</div></td><td>${esc(r.pay_label||'')}${r.status==='paid'&&r.paid_amount?`<div style="color:var(--green)">got ${money(r.paid_amount)}</div>`:''}</td><td>${esc(r.status)}</td><td><div class="row">
+    <select id="st_${esc(r.slug)}">${['found','saved','applied','booked','paid','passed'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select>
+    <button onclick="setSt('${esc(r.slug)}')">Set</button>
+    <input id="amt_${esc(r.slug)}" type="number" step="0.01" placeholder="$ paid" style="width:100px">
+    <button class="green" onclick="markPaid('${esc(r.slug)}')">💵 Paid</button>
+    <button class="red" onclick="delOpp('${esc(r.slug)}')">Delete</button>
+  </div></td></tr>`).join('')+'</table>';
+}
+window.addOpp=async()=>{
+  const body={slug:document.querySelector('#f_slug').value.trim(),title:document.querySelector('#f_title').value.trim(),platform:document.querySelector('#f_platform').value.trim(),category:document.querySelector('#f_category').value,status:document.querySelector('#f_status').value,pay_label:document.querySelector('#f_paylabel').value.trim(),pay_low:parseFloat(document.querySelector('#f_paylow').value)||null,pay_high:parseFloat(document.querySelector('#f_payhigh').value)||null,url:document.querySelector('#f_url').value.trim(),location:document.querySelector('#f_location').value.trim(),requirements:document.querySelector('#f_requirements').value.trim(),note:document.querySelector('#f_note').value.trim()};
+  if(!body.slug||!body.title){alert('Slug and title are required.');return;}
+  const r=await fetch('/api/admin/opportunities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok){flash('✓ Saved '+body.slug);load();}else alert('Save failed: '+(await r.text()));
+};
+window.setSt=async(slug)=>{const st=document.querySelector('#st_'+CSS.escape(slug)).value;const r=await fetch('/api/opportunities/'+slug,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:st})});if(r.ok){flash('✓ '+slug+' → '+st);load();}else alert('Failed');};
+window.markPaid=async(slug)=>{const amt=parseFloat(document.querySelector('#amt_'+CSS.escape(slug)).value);if(!amt&&amt!==0){alert('Type the $ amount you actually got first.');return;}const r=await fetch('/api/admin/opportunities/'+slug+'/paid',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:amt})});if(r.ok){flash('💵 '+slug+' paid '+money(amt));load();}else alert('Failed');};
+window.delOpp=async(slug)=>{if(!confirm('Delete '+slug+' for good?'))return;const r=await fetch('/api/admin/opportunities/'+slug,{method:'DELETE'});if(r.ok){flash('Deleted '+slug);load();}else alert('Failed');};
+load();
+</script></body></html>

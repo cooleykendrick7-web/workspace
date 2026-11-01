@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Workspace — Ken's Money Board</title>
+<meta name="theme-color" content="#0b1020">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Workspace">
+<style>
+:root{--bg:#070b16;--panel:#0e1628;--panel2:#121f3a;--line:#21335c;--txt:#e8eefc;--mut:#93a7cf;--gold:#fbbf24;--green:#4ade80;--acc:#38bdf8;--pink:#f472b6;--purple:#a78bfa}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+header{padding:16px 18px;background:linear-gradient(90deg,#0b1020,#1e1b4b);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+h1{margin:0;font-size:24px}.sub{color:#b6c2e8;font-size:13px;margin-top:3px}
+main{max-width:1020px;margin:0 auto;padding:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}.card b{font-size:26px;display:block}.card span{color:var(--mut);font-size:13px}
+button{background:var(--acc);color:#04121f;border:0;padding:9px 14px;border-radius:9px;font-weight:700;cursor:pointer;font-size:14px}
+button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+button.admin{background:var(--gold);color:#231a02;padding:11px 18px;font-size:15px;border-radius:11px}
+button.save{background:#334155;color:#fff;padding:8px 12px;font-size:13px}
+button.apply{background:#166534;color:#fff;padding:8px 12px;font-size:13px}
+button.book{background:#7c3aed;color:#fff;padding:8px 12px;font-size:13px}
+button.paidb{background:#16a34a;color:#fff;padding:8px 12px;font-size:13px}
+button.pass{background:#7f1d1d;color:#fff;padding:8px 12px;font-size:13px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tab{padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:700;cursor:pointer}
+.tab.on{background:var(--acc);color:#04121f;border-color:var(--acc)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+td,th{padding:11px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;vertical-align:top}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;white-space:nowrap}
+.found{background:#1e3a5f;color:#bfdbfe}.saved{background:#155e75;color:#cffafe}.applied{background:#713f12;color:#fde68a}.booked{background:#4c1d95;color:#ddd6fe}.paid{background:#4ade80;color:#052e16}.passed{background:#475569;color:#e2e8f0}
+.cat-test{background:#0f766e;color:#ccfbf1}.cat-sponsor{background:#9d174d;color:#fbcfe8}.cat-casting{background:#6d28d9;color:#ede9fe}
+.mut{color:var(--mut);font-size:13px}a{color:var(--acc)}h2{margin:22px 0 6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pay{color:var(--gold);font-weight:800}
+#liveDot{display:inline-block;width:9px;height:9px;border-radius:99px;background:#4ade80;margin-right:6px}
+select,input{background:#0a1424;color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:9px;font-size:14px}
+.flash{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:#14532d;color:#bbf7d0;border:1px solid #16a34a;padding:12px 18px;border-radius:12px;font-weight:700;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.notebox{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0;font-size:14px}
+</style></head>
+<body>
+<header><div class="row" style="justify-content:space-between"><div><h1>🧰 Workspace</h1><div class="sub"><span id="liveDot"></span>Live money board — product testing + sponsorships that pay YOU, plus casting roles on the side. Auto-refreshes every 20 seconds. <span id="upd" class="mut"></span></div></div>
+<div class="row"><a href="/operator"><button class="admin" style="background:#4ade80">🛰️ Operator Panel</button></a><a href="/admin"><button class="admin">⚙️ Admin Board — tap to enter (no password)</button></a></div></div></header>
+<main>
+<div class="cards">
+  <div class="card"><span>💵 Paid to you (real money received)</span><b style="color:var(--green)" id="cPaid">$0</b><span id="cPaidN"></span></div>
+  <div class="card"><span>🎯 You're working on</span><b style="color:var(--acc)" id="cActive">0</b><span>saved + applied + booked</span></div>
+  <div class="card"><span>🔎 Total opportunities found</span><b id="cTotal">0</b><span id="cCats"></span></div>
+  <div class="card"><span>💰 Top-end potential (all live listings)</span><b style="color:var(--gold)" id="cPot">$0</b><span>if you landed the top of every range — ranges, not promises</span></div>
+</div>
+
+<div class="notebox"><b>How this board works — super simple:</b><br>
+<span class="mut">🧪 <b style="color:var(--txt)">Test</b> = sites pay you cash (or free products) to try products/apps and say what you think.<br>
+🤝 <b style="color:var(--txt)">Sponsor</b> = brands pay you to post about / film their product. “UGC” means you film it, they run the ad — no followers needed on the beginner ones.<br>
+🎬 <b style="color:var(--txt)">Casting (side job)</b> = paid acting / extra roles. Legit casting NEVER charges you to audition — anyone asking for an upfront fee is a scam.<br>
+Tap <b style="color:var(--txt)">Save</b> on anything you like, <b style="color:var(--txt)">Applied</b> after you sign up / apply, <b style="color:var(--txt)">Booked</b> when you land one, and put the real dollars in Admin when you get <b style="color:var(--txt)">Paid</b>.</span></div>
+
+<div class="tabs">
+  <button class="tab on" data-f="all">All</button>
+  <button class="tab" data-f="test">🧪 Product Testing</button>
+  <button class="tab" data-f="sponsor">🤝 Sponsorships</button>
+  <button class="tab" data-f="casting">🎬 Casting Roles (side job)</button>
+</div>
+<div class="row" style="margin:6px 0">
+  <label class="mut" for="sortSel"><b>Sort by:</b></label>
+  <select id="sortSel">
+    <option value="pay_high">💰 Pay — HIGH to low</option>
+    <option value="pay_low">💰 Pay — LOW to high</option>
+    <option value="name">🔤 Name A–Z</option>
+    <option value="status">📌 Status</option>
+  </select>
+  <input id="q" placeholder="Search platform, title, location…" style="flex:1;min-width:180px">
+</div>
+
+<div id="wrap"></div>
+
+<div class="notebox"><b>📱 Put Workspace on your home screen:</b><div class="mut" style="margin-top:6px"><b>iPhone:</b> Share → <b>Add to Home Screen</b>. <b>Android:</b> ⋮ menu → <b>Install app</b>.</div></div>
+<p class="mut" style="text-align:center;margin-top:16px">Workspace v1.0 · Pay ranges are what platforms publish / widely report — never a guarantee · “Paid” counts only money actually received · Researched & verified Nov 1, 2026.</p>
+</main>
+<div id="flashWrap"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'$'+Number(n||0).toLocaleString('en-US',{maximumFractionDigits:0});
+let all=[], filter='all';
+const catLabel={test:'🧪 TEST',sponsor:'🤝 SPONSOR',casting:'🎬 CASTING'};
+function badge(st){return `<span class="badge ${st}">${st}</span>`}
+function sortRows(rows){
+  const mode=$('#sortSel').value; const arr=[...rows];
+  if(mode==='pay_high')arr.sort((a,b)=>(b.pay_high||0)-(a.pay_high||0));
+  else if(mode==='pay_low')arr.sort((a,b)=>(a.pay_high||0)-(b.pay_high||0));
+  else if(mode==='name')arr.sort((a,b)=>a.platform.localeCompare(b.platform));
+  else if(mode==='status')arr.sort((a,b)=>a.status.localeCompare(b.status));
+  return arr;
+}
+function render(){
+  const q=($('#q').value||'').toLowerCase();
+  let rows=all.filter(r=>(filter==='all'||r.category===filter)&&(!q||(r.platform+' '+r.title+' '+r.location+' '+r.note).toLowerCase().includes(q)));
+  rows=sortRows(rows);
+  if(!rows.length){$('#wrap').innerHTML='<div class="notebox">Nothing matches that filter yet.</div>';return;}
+  $('#wrap').innerHTML='<table><tr><th>Opportunity</th><th>Type</th><th>Pay</th><th>Where / Needs</th><th>Status</th><th>Your move</th></tr>'+rows.map(r=>{
+    const name=r.url?`<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.platform)}</a>`:esc(r.platform);
+    let acts='';
+    if(r.status==='found')acts=`<div class="row"><button class="save" onclick="setStatus('${r.slug}','saved')">⭐ Save</button><button class="apply" onclick="setStatus('${r.slug}','applied')">✍️ Applied</button><button class="pass" onclick="setStatus('${r.slug}','passed')">✗ Pass</button></div>`;
+    else if(r.status==='saved')acts=`<div class="row"><button class="apply" onclick="setStatus('${r.slug}','applied')">✍️ Applied</button><button class="pass" onclick="setStatus('${r.slug}','passed')">✗ Pass</button></div>`;
+    else if(r.status==='applied')acts=`<div class="row"><button class="book" onclick="setStatus('${r.slug}','booked')">🎉 Booked it</button><button class="pass" onclick="setStatus('${r.slug}','passed')">✗ Pass</button></div>`;
+    else if(r.status==='booked')acts=`<span class="mut">Booked — mark Paid in Admin when the money lands 💵</span>`;
+    else if(r.status==='paid')acts=`<span class="mut">💵 Paid ${r.paid_amount?money(r.paid_amount):''}</span>`;
+    else acts=`<div class="row"><button class="save" onclick="setStatus('${r.slug}','found')">↩️ Reopen</button></div>`;
+    return `<tr><td><b>${name}</b> — ${esc(r.title)}<div class="mut">${esc(r.note||'')}</div></td><td><span class="badge cat-${r.category}">${catLabel[r.category]}</span></td><td><span class="pay">${esc(r.pay_label||'')}</span></td><td>${esc(r.location||'')}<div class="mut">${esc(r.requirements||'')}</div></td><td>${badge(r.status)}</td><td>${acts}</td></tr>`;
+  }).join('')+'</table>';
+}
+function flash(msg){$('#flashWrap').innerHTML=`<div class="flash">${esc(msg)}</div>`;setTimeout(()=>$('#flashWrap').innerHTML='',3200);}
+async function load(){
+  try{
+    const [opps,sum]=await Promise.all([fetch('/api/opportunities').then(r=>r.json()),fetch('/api/summary').then(r=>r.json())]);
+    all=opps;
+    $('#cPaid').textContent='$'+Number(sum.paid_total||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    $('#cPaidN').textContent=sum.counts.paid?sum.counts.paid+' paid gig(s)':'nothing has paid out yet — first one is coming';
+    $('#cActive').textContent=sum.active_count;
+    $('#cTotal').textContent=sum.total;
+    $('#cCats').textContent=`${sum.by_category.test} testing · ${sum.by_category.sponsor} sponsor · ${sum.by_category.casting} casting`;
+    $('#cPot').textContent=money(sum.all_potential_high);
+    $('#upd').textContent='Updated '+new Date().toLocaleTimeString();
+    render();
+  }catch(e){}
+}
+window.setStatus=async(slug,status)=>{const r=await fetch('/api/opportunities/'+slug,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});if(r.ok){flash('✓ Updated — '+status);load();}else alert('Could not update.');};
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');filter=t.dataset.f;render();});
+$('#sortSel').onchange=render; $('#q').oninput=render;
+load(); setInterval(load,20000);
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+</script></body></html>
