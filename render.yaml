@@ -1,0 +1,15 @@
+# Workspace — Render Blueprint
+services:
+  - type: web
+    name: workspace
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    disk:
+      name: workspace-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: WORKSPACE_DB
+        value: /data/workspace.db
