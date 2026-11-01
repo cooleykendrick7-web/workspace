@@ -20,7 +20,7 @@ from pydantic import BaseModel
 BASE = Path(__file__).parent
 DB_PATH = os.environ.get("WORKSPACE_DB", str(BASE / "workspace.db"))
 
-app = FastAPI(title="Workspace", version="1.1.0")
+app = FastAPI(title="Workspace", version="1.2.0")
 SIGNUP_STATES = ("not_started", "queued", "started", "done", "needs_ken")
 BATCH1 = ("billo", "collabstr", "mycastingfile", "usertesting", "respondent")  # easiest free signups, first auto-signup run
 
@@ -80,6 +80,8 @@ def init_db():
       location TEXT, requirements TEXT, note TEXT,
       status TEXT DEFAULT 'found', paid_amount REAL DEFAULT 0,
       updated_at TEXT)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS punches(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, ts TEXT)""")
     cols = {r[1] for r in c.execute("PRAGMA table_info(opportunities)")}
     if "signup_state" not in cols:
         c.execute("ALTER TABLE opportunities ADD COLUMN signup_state TEXT DEFAULT 'not_started'")
@@ -100,7 +102,7 @@ async def headers(request: Request, call_next):
 
 @app.get("/healthz")
 async def healthz():
-    return {"ok": True, "service": "workspace", "version": "1.1.0"}
+    return {"ok": True, "service": "workspace", "version": "1.2.0"}
 
 @app.get("/api/opportunities")
 async def api_list(category: str | None = None):
@@ -189,6 +191,43 @@ async def api_delete(slug: str):
     if not n: raise HTTPException(404, "Not found.")
     return {"ok": True}
 
+def _clock_state(c):
+    rows = c.execute("SELECT * FROM punches ORDER BY id ASC").fetchall()
+    clocked_in = False; since = None; total = 0.0; last_in = None
+    for r in rows:
+        t = datetime.datetime.fromisoformat(r["ts"])
+        if r["action"] == "in":
+            clocked_in = True; since = r["ts"]; last_in = t
+        elif r["action"] == "out" and clocked_in and last_in is not None:
+            total += (t - last_in).total_seconds(); clocked_in = False; since = None; last_in = None
+    hist = c.execute("SELECT * FROM punches ORDER BY id DESC LIMIT 12").fetchall()
+    return {"clocked_in": clocked_in, "since": since,
+            "total_seconds_done": int(total),
+            "history": [dict(r) for r in hist]}
+
+@app.get("/api/operator/clock")
+async def api_clock_get():
+    c = db(); st = _clock_state(c); c.close()
+    return st
+
+class ClockIn(BaseModel):
+    action: str
+
+@app.post("/api/operator/clock")
+async def api_clock_post(body: ClockIn):
+    # Ken's time card — no password by his order. Sliding the card IS the punch.
+    if body.action not in ("in", "out"):
+        raise HTTPException(400, "Action must be 'in' or 'out'.")
+    c = db(); st = _clock_state(c)
+    if body.action == "in" and st["clocked_in"]:
+        c.close(); raise HTTPException(400, "Already clocked in.")
+    if body.action == "out" and not st["clocked_in"]:
+        c.close(); raise HTTPException(400, "Not clocked in.")
+    ts = datetime.datetime.utcnow().isoformat()
+    c.execute("INSERT INTO punches(action, ts) VALUES(?, ?)", (body.action, ts))
+    c.commit(); st = _clock_state(c); c.close()
+    return {"ok": True, "action": body.action, "ts": ts, **st}
+
 @app.get("/api/operator/summary")
 async def api_operator_summary():
     c = db(); rows = c.execute("SELECT * FROM opportunities").fetchall(); c.close()
@@ -198,7 +237,7 @@ async def api_operator_summary():
     queued = [dict(r) for r in rows if (r["signup_state"] or "") == "queued"]
     signed_up = [dict(r) for r in rows if (r["signup_state"] or "") == "done"]
     return {
-        "service": "workspace", "version": "1.1.0",
+        "service": "workspace", "version": "1.2.0",
         "total": len(rows),
         "by_category": {cat: cnt("category", cat) for cat in CATEGORIES},
         "by_status": {s: cnt("status", s) for s in STATUSES},
